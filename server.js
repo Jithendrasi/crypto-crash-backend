@@ -23,6 +23,11 @@ app.use("/api/wallet", walletRoutes);
 // WebSocket
 setupSocket(io);
 
+app.get("/", (req, res) => {
+  res.send("✅ Crypto Crash Backend is Running!");
+});
+
+
 // ✅ Corrected: Only one listen block inside async function
 const startServer = async () => {
   try {
