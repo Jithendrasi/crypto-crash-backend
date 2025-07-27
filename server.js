@@ -13,29 +13,45 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(cors());
+// ✅ Allow cross-origin from any frontend (especially Netlify)
+app.use(cors({
+  origin: "*", // You can restrict this to Netlify URL like "https://your-site.netlify.app"
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
 app.use(express.json());
+
+// ✅ Routes
 app.use("/api/bet", betRoutes);
 app.use("/api/wallet", walletRoutes);
 
-// WebSocket
-setupSocket(io);
-
+// ✅ Health check route for Render or Netlify
 app.get("/", (req, res) => {
   res.send("✅ Crypto Crash Backend is Running!");
 });
 
+// ✅ WebSocket with CORS
+const io = new Server(server, {
+  cors: {
+    origin: "*", // You can restrict this to your frontend origin
+    methods: ["GET", "POST"]
+  }
+});
 
-// ✅ Corrected: Only one listen block inside async function
+// ✅ Setup game socket
+setupSocket(io);
+
+// ✅ MongoDB & Server boot
 const startServer = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI); // ✅ removed deprecated options
+    await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB connected");
 
-    server.listen(process.env.PORT || 3000, () => {
-      console.log("🚀 Server running on port 3000");
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
     });
 
   } catch (err) {
