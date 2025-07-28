@@ -1,26 +1,44 @@
 const axios = require("axios");
 
-let cache = {};
-let lastFetched = 0;
+const cache = {};           // Stores price per coinId
+const lastFetched = {};     // Stores timestamp per coinId
 
-exports.getCryptoPrice = async (coinId) => {
+const CACHE_DURATION = 60000; // 60 seconds (can reduce to 15000 = 15 sec if needed)
+
+exports.getCryptoPrice = async (coinId, retries = 2) => {
   const now = Date.now();
 
-  // Reuse price if it's been fetched within the last 15 seconds
-  if (cache[coinId] && now - lastFetched < 15000) {
+  //  Return from cache if within duration
+  if (cache[coinId] && lastFetched[coinId] && now - lastFetched[coinId] < CACHE_DURATION) {
+    console.log("✅ Returning cached price for", coinId, cache[coinId]);
     return cache[coinId];
   }
 
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
-  const response = await axios.get(url);
+  try {
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
+    const response = await axios.get(url);
+    const price = response.data[coinId]?.usd;
 
-  const price = response.data[coinId]?.usd;
+    if (!price) {
+      throw new Error("❌ Price not found in API response");
+    }
 
-  if (!price) throw new Error("Price not found");
+    cache[coinId] = price;
+    lastFetched[coinId] = now;
+    console.log("🔁 CoinGecko Price Fetched:", coinId, price);
 
-  cache[coinId] = price;
-  lastFetched = now;
+    return price;
 
-  console.log("🔁 CoinGecko Price Fetched:", coinId, price);
-  return price;
+  } catch (error) {
+    console.warn("⚠️ Error fetching price:", error.message);
+
+    // Retry if allowed
+    if (retries > 0) {
+      console.log(`🔄 Retrying (${retries})...`);
+      await new Promise(resolve => setTimeout(resolve, 500)); // wait 500ms
+      return exports.getCryptoPrice(coinId, retries - 1);
+    } else {
+      throw new Error("❌ Failed to fetch price after retries");
+    }
+  }
 };
